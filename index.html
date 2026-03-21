@@ -1,80 +1,146 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
 <meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
 
 <style>
-body{
+*{
+box-sizing:border-box;
 margin:0;
+padding:0;
+}
+
+body{
+font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
 background:transparent;
-font-family:'Segoe UI',sans-serif;
+overflow:hidden;
 }
 
+/* OUTER FRAME (WHITE CLEAN) */
 .widget{
+width:100%;
 padding:10px;
-border-radius:24px;
-background:linear-gradient(145deg,#0b1220,#02040a);
-box-shadow:inset 0 0 20px rgba(255,255,255,0.03),
-0 10px 30px rgba(0,0,0,0.6);
+border-radius:26px;
+background:linear-gradient(180deg,#ffffff,#f4f6fa);
+box-shadow:
+0 10px 30px rgba(0,0,0,0.15),
+inset 0 1px 0 rgba(255,255,255,0.8);
 }
 
+/* INNER DARK CORE */
+.inner{
+border-radius:22px;
+padding:18px;
+background:linear-gradient(160deg,#0a0c12,#141824);
+box-shadow:
+inset 0 0 25px rgba(255,255,255,0.04),
+0 0 20px rgba(0,0,0,0.5);
+}
+
+/* TITLE */
 .title{
 text-align:center;
-color:#93c5fd;
-font-size:14px;
-letter-spacing:2px;
-margin-bottom:6px;
+font-weight:900;
+font-size:18px;
+color:#ffffff;
+letter-spacing:0.5px;
 }
 
 .subtitle{
 text-align:center;
-font-size:11px;
-color:#9aa0aa;
-margin-bottom:12px;
+font-size:12px;
+color:#9aa4b2;
+margin-bottom:14px;
 }
 
-.card{
+/* MEMBER BUTTON (3D CARD) */
+.member{
 display:flex;
 align-items:center;
-gap:10px;
-padding:10px;
-margin:8px 0;
-border-radius:18px;
-background:linear-gradient(145deg,#020617,#000814);
+gap:12px;
+padding:10px 14px;
+margin:10px 0;
+border-radius:16px;
+
+background:linear-gradient(145deg,#1c2230,#0f1420);
 border:1px solid rgba(255,255,255,0.08);
-box-shadow:0 4px 12px rgba(0,0,0,0.6);
-transition:.25s;
+
+box-shadow:
+0 6px 14px rgba(0,0,0,0.6),
+inset 0 1px 0 rgba(255,255,255,0.06);
+
+transition:all .2s ease;
+cursor:pointer;
+position:relative;
 }
 
-.card:hover{
-transform:translateY(-3px) scale(1.02);
-box-shadow:0 0 15px rgba(59,130,246,0.6);
+/* HOVER RISE + GLOW */
+.member:hover{
+transform:translateY(-4px) scale(1.02);
+box-shadow:
+0 12px 25px rgba(0,0,0,0.8),
+0 0 12px rgba(120,160,255,0.25);
 }
 
+/* CLICK SQUISH */
+.member:active{
+transform:scale(0.95);
+box-shadow:
+inset 0 3px 8px rgba(0,0,0,0.8);
+}
+
+/* AVATAR */
 .avatar{
-width:38px;
-height:38px;
+width:40px;
+height:40px;
 border-radius:50%;
-border:2px solid #1e293b;
+border:2px solid rgba(255,255,255,0.2);
+object-fit:cover;
+}
+
+/* INFO */
+.info{
+flex:1;
+overflow:hidden;
 }
 
 .name{
-color:#e2e8f0;
+color:#ffffff;
+font-weight:700;
 font-size:13px;
-font-weight:600;
-text-decoration:none;
+white-space:nowrap;
+overflow:hidden;
+text-overflow:ellipsis;
 }
 
-.rating{
+.elo{
 font-size:11px;
-color:#9aa0aa;
+color:#aab3c2;
+margin-top:2px;
 }
 
+/* LOADING SHIMMER */
 .loading{
+height:50px;
+border-radius:14px;
+background:linear-gradient(90deg,#111 25%,#1c1c1c 50%,#111 75%);
+background-size:200% 100%;
+animation:shimmer 1.4s infinite;
+margin:8px 0;
+}
+
+@keyframes shimmer{
+0%{background-position:200% 0;}
+100%{background-position:-200% 0;}
+}
+
+/* FOOTER */
+.footer{
 text-align:center;
-font-size:12px;
-color:#9aa0aa;
-padding:10px;
+margin-top:10px;
+font-size:11px;
+color:#8f99a8;
 }
 </style>
 </head>
@@ -82,104 +148,103 @@ padding:10px;
 <body>
 
 <div class="widget">
+<div class="inner">
 
-<div class="title">GALACTIC CORE</div>
-<div class="subtitle">Welcome onboard ✨</div>
+<div class="title">Fresh Faces</div>
+<div class="subtitle">Fresh minds joining the board</div>
 
 <div id="members">
-<div class="loading">Loading...</div>
+<div class="loading"></div>
+<div class="loading"></div>
+<div class="loading"></div>
 </div>
 
+<div class="footer">Stay sharp ♟️</div>
+
+</div>
 </div>
 
 <script>
+const CLUB='nashediyon-ki-toli';
+const COUNT=3;
+const REFRESH=15000;
 
-const CLUB = "nashediyon-ki-toli";
-const COUNT = 3;
-
-async function fetchJSON(url){
-const res = await fetch(url);
-if(!res.ok) throw new Error();
-return res.json();
+async function get(url){
+const r=await fetch(url);
+if(!r.ok) throw new Error();
+return r.json();
 }
 
 function bestRating(stats){
-const modes=["chess_rapid","chess_blitz","chess_bullet"];
+const modes=['chess_rapid','chess_blitz','chess_bullet','chess_daily'];
 let best=null;
-
-for(const m of modes){
-const r = stats?.[m]?.last?.rating;
+modes.forEach(m=>{
+const r=stats?.[m]?.last?.rating;
 if(r && (!best || r>best)) best=r;
-}
-
-return best || "-";
+});
+return best;
 }
 
 async function load(){
 
-const container=document.getElementById("members");
+const box=document.getElementById('members');
 
 try{
 
-const data = await fetchJSON(`https://api.chess.com/pub/club/blundering-buddies/members`);
-
-const all = [
-...(data.weekly||[]),
-...(data.monthly||[]),
-...(data.all_time||[])
-];
-
-const seen=new Set();
-
-const unique = all.filter(m=>{
-if(seen.has(m.username)) return false;
-seen.add(m.username);
-return true;
-});
-
-unique.sort((a,b)=>(b.joined||0)-(a.joined||0));
-
-const latest = unique.slice(0,COUNT);
-
-const html = await Promise.all(latest.map(async m=>{
-
-let avatar="";
-let rating="-";
-
-try{
-const [p,s] = await Promise.all([
-fetchJSON(`https://api.chess.com/pub/player/${m.username}`),
-fetchJSON(`https://api.chess.com/pub/player/${m.username}/stats`)
+const [w,m,a]=await Promise.all([
+get(`https://api.chess.com/pub/club/${CLUB}/members/weekly`).catch(()=>[]),
+get(`https://api.chess.com/pub/club/${CLUB}/members/monthly`).catch(()=>[]),
+get(`https://api.chess.com/pub/club/${CLUB}/members/all`).catch(()=>[])
 ]);
 
-avatar = p.avatar || "";
-rating = bestRating(s);
+const all=[...w,...m,...a];
 
-}catch{}
+const map=new Map();
+all.forEach(x=>{
+if(!map.has(x.username)) map.set(x.username,x);
+});
 
-return `
-<div class="card" onclick="window.open('https://www.chess.com/member/${m.username}')">
-<img class="avatar" src="${avatar || 'https://www.chess.com/bundles/web/images/noavatar_l.84a92436.gif'}">
-<div>
-<div class="name">@${m.username}</div>
-<div class="rating">Rating: ${rating}</div>
-</div>
-</div>
-`;
+const arr=[...map.values()]
+.sort((a,b)=>(b.joined||0)-(a.joined||0))
+.slice(0,COUNT);
 
+const cards=await Promise.all(arr.map(async u=>{
+try{
+const [p,s]=await Promise.all([
+get(`https://api.chess.com/pub/player/${u.username}`),
+get(`https://api.chess.com/pub/player/${u.username}/stats`)
+]);
+return {
+name:u.username,
+avatar:p.avatar,
+elo:bestRating(s)
+};
+}catch{
+return {name:u.username};
+}
 }));
 
-container.innerHTML = html.join("");
+box.innerHTML=cards.map(c=>`
+<div class="member" onclick="window.open('https://www.chess.com/member/${c.name}','_blank')">
+
+<img class="avatar" src="${c.avatar||'https://www.chess.com/bundles/web/images/user-image.007dad08.svg'}">
+
+<div class="info">
+<div class="name">@${c.name}</div>
+<div class="elo">${c.elo ? 'Rating: '+c.elo : 'Unrated'}</div>
+</div>
+
+</div>
+`).join('');
 
 }catch{
-container.innerHTML = `<div class="loading">Waiting for API...</div>`;
+box.innerHTML='<div class="subtitle">Unable to load</div>';
 }
 
 }
 
 load();
-setInterval(load,10000);
-
+setInterval(load,REFRESH);
 </script>
 
 </body>
