@@ -1,110 +1,69 @@
-<!DOCTYPE html>
-<html>
-<head>
-<meta charset="UTF-8">
-<title>NKT Member Widget V3</title>
-</head>
-
-<body style="margin:0;background:transparent;">
-
-<div style="
-width:250px;
-margin:0 auto;
-padding:14px;
-background:rgba(235,242,255,0.78);
-border-radius:20px;
-border:1px solid rgba(110,168,255,0.45);
-box-shadow:0 12px 30px rgba(0,0,0,0.25),0 0 25px rgba(110,168,255,0.25);
-backdrop-filter:blur(12px);
-font-family:Segoe UI;
-color:#0b1a2b;
-text-align:center;
-">
-
-<div style="
-font-size:14px;
-letter-spacing:2px;
-margin-bottom:12px;
-color:#2a4d8f;
-text-shadow:0 0 10px rgba(110,168,255,0.5);
-">
-NEW MEMBERS
-</div>
-
-<div id="members"></div>
-
-<!-- MILESTONES -->
-<div style="
-margin-top:14px;
-padding-top:10px;
-border-top:1px solid rgba(110,168,255,0.3);
-">
-
-<div style="
-font-size:12px;
-letter-spacing:1px;
-margin-bottom:6px;
-color:#2a4d8f;
-">
-MILESTONES
-</div>
-
-<div id="milestones" style="font-size:10px;text-align:left;"></div>
-
-</div>
-
-</div>
-
 <script>
 
 const club = "nashediyon-ki-toli";
+const SHOW_COUNT = 3;
+
+async function fetchJSON(url){
+const res = await fetch(url);
+if(!res.ok) throw new Error("HTTP "+res.status);
+return res.json();
+}
+
+function getBestRating(stats){
+const formats = ["chess_rapid","chess_blitz","chess_bullet","chess_daily"];
+for(let f of formats){
+if(stats?.[f]?.last?.rating){
+return stats[f].last.rating;
+}
+}
+return "--";
+}
 
 async function loadMembers(){
 
-let res = await fetch(`https://api.chess.com/pub/club/${club}/members`);
-let data = await res.json();
+let data = await fetchJSON(`https://api.chess.com/pub/club/${club}/members`);
 
-let current = data.all_time.map(u=>u.username);
-let total = current.length;
+// ✅ MERGE ALL
+let all = [
+...(data.weekly || []),
+...(data.monthly || []),
+...(data.all_time || [])
+];
 
-// ===== JOIN TRACKING =====
-let stored = JSON.parse(localStorage.getItem("nkt_members") || "[]");
-let newMembers = current.filter(u => !stored.includes(u));
+// ✅ REMOVE DUPES
+let seen = new Set();
+let unique = all.filter(m=>{
+if(seen.has(m.username)) return false;
+seen.add(m.username);
+return true;
+});
 
-localStorage.setItem("nkt_members", JSON.stringify(current));
+// ✅ SORT BY REAL JOIN DATE
+unique.sort((a,b)=>(b.joined||0)-(a.joined||0));
 
-if(newMembers.length === 0){
-newMembers = current.slice(0,3);
-}
+// ✅ TAKE TOP 3 (REAL LATEST)
+let recent = unique.slice(0, SHOW_COUNT);
 
-newMembers = newMembers.slice(0,3);
-
-// ===== MILESTONE TRACKING =====
-let milestones = JSON.parse(localStorage.getItem("nkt_milestones") || "{}");
-
-let nextMark = Math.floor(total / 100) * 100;
-
-if(nextMark >= 100 && !milestones[nextMark]){
-let today = new Date().toLocaleDateString();
-milestones[nextMark] = today;
-localStorage.setItem("nkt_milestones", JSON.stringify(milestones));
-}
-
-// ===== DISPLAY MEMBERS =====
 let container = document.getElementById("members");
 container.innerHTML = "";
 
-for(let i=0;i<newMembers.length;i++){
+for(let i=0;i<recent.length;i++){
 
-let username = newMembers[i];
+let username = recent[i].username;
 
-let profile = await (await fetch(`https://api.chess.com/pub/player/${username}`)).json();
-let status = await (await fetch(`https://api.chess.com/pub/player/${username}/is-online`)).json();
+// fetch all data together
+let [profile, stats, status] = await Promise.all([
+fetchJSON(`https://api.chess.com/pub/player/${username}`),
+fetchJSON(`https://api.chess.com/pub/player/${username}/stats`),
+fetchJSON(`https://api.chess.com/pub/player/${username}/is-online`)
+]);
 
+let avatar = profile.avatar || 'https://www.chess.com/bundles/web/images/noavatar_l.84a92436.gif';
+let rating = getBestRating(stats);
 let online = status.online;
-let rating = profile.chess_rapid?.last?.rating || "--";
 
-let isNew = newMembers.includes(username);
+// NEW badge if joined in last 24h
+let isNew = (Date.now()/1000 - (recent[i].joined||0)) < 86400;
 
 let badge = isNew ? `<div style="
 font-size:9px;
@@ -112,6 +71,7 @@ color:#00ff9f;
 text-shadow:0 0 6px #00ff9f;
 ">NEW</div>` : "";
 
+// ===== BIG CARD =====
 if(i===0){
 
 container.innerHTML += `
@@ -126,14 +86,14 @@ box-shadow:0 0 12px rgba(110,168,255,0.4);
 animation:fadeIn .5s ease;
 ">
 
-<img src="${profile.avatar || 'https://www.chess.com/bundles/web/images/noavatar_l.84a92436.gif'}"
+<img src="${avatar}"
 style="width:70px;height:70px;border-radius:50%;margin-bottom:8px;">
 
 <div style="font-size:13px;">${username}</div>
 
 ${badge}
 
-<div style="font-size:10px;">Rapid: ${rating}</div>
+<div style="font-size:10px;">Rating: ${rating}</div>
 
 <div style="
 font-size:10px;
@@ -148,6 +108,7 @@ text-shadow:${online ? '0 0 8px #00ff9f' : 'none'};
 
 }else{
 
+// ===== SMALL ROWS =====
 container.innerHTML += `
 <div style="
 display:flex;
@@ -161,7 +122,7 @@ border:1px solid rgba(110,168,255,0.3);
 animation:fadeIn .5s ease;
 ">
 
-<img src="${profile.avatar || 'https://www.chess.com/bundles/web/images/noavatar_l.84a92436.gif'}"
+<img src="${avatar}"
 style="width:32px;height:32px;border-radius:50%;margin-right:10px;">
 
 <div style="flex:1;text-align:left;font-size:12px;">
@@ -188,23 +149,15 @@ animation:${online ? 'pulse 1.5s infinite' : 'none'};
 
 }
 
-// ===== DISPLAY MILESTONES =====
-let milestoneDiv = document.getElementById("milestones");
-milestoneDiv.innerHTML = "";
-
-Object.keys(milestones).sort((a,b)=>b-a).forEach(k=>{
-milestoneDiv.innerHTML += `<div>${k} members — ${milestones[k]}</div>`;
-});
-
 }
 
 // animations
 const style = document.createElement("style");
 style.innerHTML = `
 @keyframes pulse{
-0%{transform:scale(1);opacity:1;}
-50%{transform:scale(1.4);opacity:0.6;}
-100%{transform:scale(1);opacity:1;}
+0%{transform:scale(1);}
+50%{transform:scale(1.4);}
+100%{transform:scale(1);}
 }
 @keyframes fadeIn{
 from{opacity:0;transform:translateY(10px);}
@@ -217,6 +170,3 @@ loadMembers();
 setInterval(loadMembers,30000);
 
 </script>
-
-</body>
-</html>
