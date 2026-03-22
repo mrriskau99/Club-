@@ -2,12 +2,12 @@
 <html>
 <head>
 <meta charset="UTF-8">
-<title>NKT Member Widget</title>
+<title>NKT Member Widget V3</title>
 </head>
 
 <body style="margin:0;background:transparent;">
 
-<div id="app" style="
+<div style="
 width:250px;
 margin:0 auto;
 padding:14px;
@@ -33,40 +33,87 @@ NEW MEMBERS
 
 <div id="members"></div>
 
+<!-- MILESTONES -->
+<div style="
+margin-top:14px;
+padding-top:10px;
+border-top:1px solid rgba(110,168,255,0.3);
+">
+
+<div style="
+font-size:12px;
+letter-spacing:1px;
+margin-bottom:6px;
+color:#2a4d8f;
+">
+MILESTONES
+</div>
+
+<div id="milestones" style="font-size:10px;text-align:left;"></div>
+
+</div>
+
 </div>
 
 <script>
 
-const club = "nashediyon-ki-toli"; // CHANGE if needed
+const club = "nashediyon-ki-toli";
 
 async function loadMembers(){
 
-let res = await fetch(`https://api.chess.com/pub/club/nashediyon-ki-toli/members`);
+let res = await fetch(`https://api.chess.com/pub/club/${club}/members`);
 let data = await res.json();
 
-// take first 3 users
-let users = data.all_time.slice(0,3);
+let current = data.all_time.map(u=>u.username);
+let total = current.length;
 
+// ===== JOIN TRACKING =====
+let stored = JSON.parse(localStorage.getItem("nkt_members") || "[]");
+let newMembers = current.filter(u => !stored.includes(u));
+
+localStorage.setItem("nkt_members", JSON.stringify(current));
+
+if(newMembers.length === 0){
+newMembers = current.slice(0,3);
+}
+
+newMembers = newMembers.slice(0,3);
+
+// ===== MILESTONE TRACKING =====
+let milestones = JSON.parse(localStorage.getItem("nkt_milestones") || "{}");
+
+let nextMark = Math.floor(total / 100) * 100;
+
+if(nextMark >= 100 && !milestones[nextMark]){
+let today = new Date().toLocaleDateString();
+milestones[nextMark] = today;
+localStorage.setItem("nkt_milestones", JSON.stringify(milestones));
+}
+
+// ===== DISPLAY MEMBERS =====
 let container = document.getElementById("members");
-
 container.innerHTML = "";
 
-for(let i=0;i<users.length;i++){
+for(let i=0;i<newMembers.length;i++){
 
-let username = users[i].username;
+let username = newMembers[i];
 
-// fetch profile
-let profileRes = await fetch(`https://api.chess.com/pub/player/${username}`);
-let profile = await profileRes.json();
+let profile = await (await fetch(`https://api.chess.com/pub/player/${username}`)).json();
+let status = await (await fetch(`https://api.chess.com/pub/player/${username}/is-online`)).json();
 
-// fetch status
-let statusRes = await fetch(`https://api.chess.com/pub/player/${username}/is-online`);
-let statusData = await statusRes.json();
+let online = status.online;
+let rating = profile.chess_rapid?.last?.rating || "--";
 
-let online = statusData.online;
+let isNew = newMembers.includes(username);
 
-if(i==0){
-// BIG CARD
+let badge = isNew ? `<div style="
+font-size:9px;
+color:#00ff9f;
+text-shadow:0 0 6px #00ff9f;
+">NEW</div>` : "";
+
+if(i===0){
+
 container.innerHTML += `
 <div style="
 margin-bottom:12px;
@@ -75,7 +122,8 @@ border-radius:18px;
 background:linear-gradient(145deg,#0c1324,#05070d);
 color:#dbe6ff;
 border:1px solid rgba(110,168,255,0.3);
-box-shadow:0 0 10px rgba(110,168,255,0.3);
+box-shadow:0 0 12px rgba(110,168,255,0.4);
+animation:fadeIn .5s ease;
 ">
 
 <img src="${profile.avatar || 'https://www.chess.com/bundles/web/images/noavatar_l.84a92436.gif'}"
@@ -83,17 +131,23 @@ style="width:70px;height:70px;border-radius:50%;margin-bottom:8px;">
 
 <div style="font-size:13px;">${username}</div>
 
+${badge}
+
+<div style="font-size:10px;">Rapid: ${rating}</div>
+
 <div style="
 font-size:10px;
 color:${online ? '#00ff9f' : '#888'};
+text-shadow:${online ? '0 0 8px #00ff9f' : 'none'};
 ">
-${online ? '● ONLINE' : '● OFFLINE'}
+● ${online ? 'ONLINE' : 'OFFLINE'}
 </div>
 
 </div>
 `;
+
 }else{
-// SMALL CARDS
+
 container.innerHTML += `
 <div style="
 display:flex;
@@ -104,26 +158,63 @@ border-radius:999px;
 background:linear-gradient(145deg,#0c1324,#05070d);
 color:#dbe6ff;
 border:1px solid rgba(110,168,255,0.3);
+animation:fadeIn .5s ease;
 ">
 
 <img src="${profile.avatar || 'https://www.chess.com/bundles/web/images/noavatar_l.84a92436.gif'}"
 style="width:32px;height:32px;border-radius:50%;margin-right:10px;">
 
-<div style="flex:1;text-align:left;font-size:12px;">${username}</div>
+<div style="flex:1;text-align:left;font-size:12px;">
+${username} ${badge}
+</div>
 
-<div style="font-size:10px;color:${online ? '#00ff9f' : '#888'};">
-●
+<div style="font-size:10px;">${rating}</div>
+
+<div style="
+margin-left:6px;
+width:8px;
+height:8px;
+border-radius:50%;
+background:${online ? '#00ff9f' : '#888'};
+box-shadow:${online ? '0 0 8px #00ff9f' : 'none'};
+animation:${online ? 'pulse 1.5s infinite' : 'none'};
+">
 </div>
 
 </div>
 `;
-}
 
 }
 
 }
+
+// ===== DISPLAY MILESTONES =====
+let milestoneDiv = document.getElementById("milestones");
+milestoneDiv.innerHTML = "";
+
+Object.keys(milestones).sort((a,b)=>b-a).forEach(k=>{
+milestoneDiv.innerHTML += `<div>${k} members — ${milestones[k]}</div>`;
+});
+
+}
+
+// animations
+const style = document.createElement("style");
+style.innerHTML = `
+@keyframes pulse{
+0%{transform:scale(1);opacity:1;}
+50%{transform:scale(1.4);opacity:0.6;}
+100%{transform:scale(1);opacity:1;}
+}
+@keyframes fadeIn{
+from{opacity:0;transform:translateY(10px);}
+to{opacity:1;transform:translateY(0);}
+}
+`;
+document.head.appendChild(style);
 
 loadMembers();
+setInterval(loadMembers,30000);
 
 </script>
 
