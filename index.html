@@ -1,172 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+
+body{
+  background:transparent;
+  font-family:Segoe UI, Arial, sans-serif;
+}
+
+/* CONTAINER */
+.widget{
+  width:100%;
+  padding:14px;
+  border-radius:18px;
+
+  background:rgba(240,245,255,0.78);
+  border:1px solid rgba(110,168,255,0.35);
+
+  box-shadow:
+    0 10px 24px rgba(0,0,0,0.22),
+    0 0 18px rgba(110,168,255,0.15);
+
+  backdrop-filter:blur(10px);
+}
+
+/* TITLE */
+.title{
+  text-align:center;
+  font-size:12px;
+  letter-spacing:2px;
+  margin-bottom:10px;
+  color:#2a4d8f;
+}
+
+/* CARD */
+.card{
+  position:relative;
+  border-radius:16px;
+  cursor:pointer;
+
+  background:linear-gradient(145deg,#0c1324,#05070d);
+  border:1px solid rgba(110,168,255,0.25);
+  color:#dbe6ff;
+
+  box-shadow:
+    inset 0 1px 2px rgba(255,255,255,0.05),
+    0 6px 14px rgba(0,0,0,0.45);
+
+  transition:
+    transform 0.35s cubic-bezier(0.22,1,0.36,1),
+    box-shadow 0.35s ease,
+    filter 0.35s ease,
+    border-color 0.35s ease;
+}
+
+/* HOVER — SLOW RISE */
+.card:hover{
+  transform:translateY(-10px) scale(1.025);
+  box-shadow:
+    0 20px 40px rgba(0,0,0,0.65),
+    0 0 22px rgba(110,168,255,0.55);
+  filter:brightness(1.08);
+  border-color:rgba(110,168,255,0.65);
+}
+
+/* CLICK — REAL SQUISH */
+.card:active{
+  transform:scale(0.85);
+  transition:transform 0.08s ease;
+  box-shadow:
+    inset 0 5px 14px rgba(0,0,0,0.85);
+}
+
+/* FEATURED */
+.featured{
+  padding:14px;
+  text-align:center;
+  margin-bottom:10px;
+}
+
+/* ROW */
+.row{
+  display:flex;
+  align-items:center;
+  gap:10px;
+  padding:10px;
+  margin:6px 0;
+  border-radius:999px;
+}
+
+/* AVATAR */
+.avatar-wrap{position:relative;}
+
+.avatar{
+  width:44px;
+  height:44px;
+  border-radius:50%;
+  border:2px solid rgba(110,168,255,0.4);
+  object-fit:cover;
+}
+
+/* STATUS */
+.status{
+  position:absolute;
+  width:8px;
+  height:8px;
+  border-radius:50%;
+  bottom:2px;
+  right:2px;
+}
+
+.online{background:#22c55e;}
+.offline{background:#4b5563;}
+
+/* NEW BADGE (GLOW + FADE) */
+.badge{
+  position:absolute;
+  top:8px;
+  right:10px;
+  font-size:9px;
+  padding:3px 6px;
+  border-radius:6px;
+  background:#22c55e;
+  color:#fff;
+  letter-spacing:1px;
+
+  box-shadow:0 0 10px rgba(34,197,94,0.8);
+  animation:badgeFade 6s forwards;
+}
+
+@keyframes badgeFade{
+  0%{opacity:1;}
+  70%{opacity:1;}
+  100%{opacity:0;}
+}
+
+/* TEXT */
+.name{font-size:12px;font-weight:600;}
+.rating{font-size:10px;opacity:.75;}
+.time{font-size:9px;opacity:.6;}
+
+/* REVEAL */
+.fade{
+  opacity:0;
+  transform:translateY(14px);
+  animation:reveal 0.6s cubic-bezier(0.22,1,0.36,1) forwards;
+}
+
+@keyframes reveal{
+  to{
+    opacity:1;
+    transform:translateY(0);
+  }
+}
+</style>
+</head>
+
+<body>
+
+<div class="widget">
+  <div class="title">NEW MEMBERS</div>
+  <div id="members"></div>
+</div>
+
 <script>
+const CLUB="nashediyon-ki-toli";
+let prevUsers = [];
 
-const club = "nashediyon-ki-toli";
-const SHOW_COUNT = 3;
+async function fetchJSON(u){return (await fetch(u)).json();}
 
-async function fetchJSON(url){
-const res = await fetch(url);
-if(!res.ok) throw new Error("HTTP "+res.status);
-return res.json();
+function getBest(stats){
+  const map={chess_rapid:'Rapid',chess_blitz:'Blitz',chess_bullet:'Bullet'};
+  let best=null;
+  for(const k in map){
+    const r=stats?.[k]?.last?.rating;
+    if(r && (!best||r>best)) best={t:map[k],r};
+  }
+  return best?`${best.t}: ${best.r}`:'Unrated';
 }
 
-function getBestRating(stats){
-const formats = ["chess_rapid","chess_blitz","chess_bullet","chess_daily"];
-for(let f of formats){
-if(stats?.[f]?.last?.rating){
-return stats[f].last.rating;
-}
-}
-return "--";
+function timeAgo(ts){
+  const diff=Math.floor((Date.now()/1000)-ts);
+  if(diff<60)return diff+"s ago";
+  if(diff<3600)return Math.floor(diff/60)+"m ago";
+  if(diff<86400)return Math.floor(diff/3600)+"h ago";
+  return Math.floor(diff/86400)+"d ago";
 }
 
-async function loadMembers(){
+async function load(){
+  const club=await fetchJSON(`https://api.chess.com/pub/club/${CLUB}/members`);
+  let all=[...club.weekly,...club.monthly,...club.all_time];
 
-let data = await fetchJSON(`https://api.chess.com/pub/club/${club}/members`);
+  const seen=new Set();
+  all=all.filter(m=>!seen.has(m.username)&&(seen.add(m.username)));
+  all.sort((a,b)=>b.joined-a.joined);
 
-// ✅ MERGE ALL
-let all = [
-...(data.weekly || []),
-...(data.monthly || []),
-...(data.all_time || [])
-];
+  const top=all.slice(0,3);
 
-// ✅ REMOVE DUPES
-let seen = new Set();
-let unique = all.filter(m=>{
-if(seen.has(m.username)) return false;
-seen.add(m.username);
-return true;
-});
+  const users=await Promise.all(top.map(async m=>{
+    try{
+      const [p,s,o]=await Promise.all([
+        fetchJSON(`https://api.chess.com/pub/player/${m.username}`),
+        fetchJSON(`https://api.chess.com/pub/player/${m.username}/stats`),
+        fetchJSON(`https://api.chess.com/pub/player/${m.username}/is-online`)
+      ]);
+      return{u:m.username,a:p.avatar,r:getBest(s),on:o.online,j:m.joined};
+    }catch{return{u:m.username,j:m.joined};}
+  }));
 
-// ✅ SORT BY REAL JOIN DATE
-unique.sort((a,b)=>(b.joined||0)-(a.joined||0));
+  /* ONLY UPDATE IF CHANGED */
+  const current = users.map(x=>x.u).join(",");
+  const previous = prevUsers.join(",");
 
-// ✅ TAKE TOP 3 (REAL LATEST)
-let recent = unique.slice(0, SHOW_COUNT);
+  if(current !== previous){
+    prevUsers = users.map(x=>x.u);
 
-let container = document.getElementById("members");
-container.innerHTML = "";
+    const f=users[0];
+    const rest=users.slice(1);
 
-for(let i=0;i<recent.length;i++){
+    document.getElementById("members").innerHTML=`
+      <div class="card featured fade"
+        onclick="window.open('https://chess.com/member/${f.u}')">
 
-let username = recent[i].username;
+        <div class="badge">NEW</div>
 
-// fetch all data together
-let [profile, stats, status] = await Promise.all([
-fetchJSON(`https://api.chess.com/pub/player/${username}`),
-fetchJSON(`https://api.chess.com/pub/player/${username}/stats`),
-fetchJSON(`https://api.chess.com/pub/player/${username}/is-online`)
-]);
+        <div class="avatar-wrap">
+          <img class="avatar" src="${f.a||''}">
+          <div class="status ${f.on?'online':'offline'}"></div>
+        </div>
 
-let avatar = profile.avatar || 'https://www.chess.com/bundles/web/images/noavatar_l.84a92436.gif';
-let rating = getBestRating(stats);
-let online = status.online;
+        <div class="name">@${f.u}</div>
+        <div class="rating">${f.r}</div>
+        <div class="time">${timeAgo(f.j)}</div>
+      </div>
 
-// NEW badge if joined in last 24h
-let isNew = (Date.now()/1000 - (recent[i].joined||0)) < 86400;
+      ${rest.map((x,i)=>`
+        <div class="card row fade"
+          style="animation-delay:${(i+1)*0.1}s"
+          onclick="window.open('https://chess.com/member/${x.u}')">
 
-let badge = isNew ? `<div style="
-font-size:9px;
-color:#00ff9f;
-text-shadow:0 0 6px #00ff9f;
-">NEW</div>` : "";
+          <div class="badge">NEW</div>
 
-// ===== BIG CARD =====
-if(i===0){
+          <div class="avatar-wrap">
+            <img class="avatar" src="${x.a||''}">
+            <div class="status ${x.on?'online':'offline'}"></div>
+          </div>
 
-container.innerHTML += `
-<div style="
-margin-bottom:12px;
-padding:12px;
-border-radius:18px;
-background:linear-gradient(145deg,#0c1324,#05070d);
-color:#dbe6ff;
-border:1px solid rgba(110,168,255,0.3);
-box-shadow:0 0 12px rgba(110,168,255,0.4);
-animation:fadeIn .5s ease;
-">
-
-<img src="${avatar}"
-style="width:70px;height:70px;border-radius:50%;margin-bottom:8px;">
-
-<div style="font-size:13px;">${username}</div>
-
-${badge}
-
-<div style="font-size:10px;">Rating: ${rating}</div>
-
-<div style="
-font-size:10px;
-color:${online ? '#00ff9f' : '#888'};
-text-shadow:${online ? '0 0 8px #00ff9f' : 'none'};
-">
-● ${online ? 'ONLINE' : 'OFFLINE'}
-</div>
-
-</div>
-`;
-
-}else{
-
-// ===== SMALL ROWS =====
-container.innerHTML += `
-<div style="
-display:flex;
-align-items:center;
-padding:8px 10px;
-margin-bottom:8px;
-border-radius:999px;
-background:linear-gradient(145deg,#0c1324,#05070d);
-color:#dbe6ff;
-border:1px solid rgba(110,168,255,0.3);
-animation:fadeIn .5s ease;
-">
-
-<img src="${avatar}"
-style="width:32px;height:32px;border-radius:50%;margin-right:10px;">
-
-<div style="flex:1;text-align:left;font-size:12px;">
-${username} ${badge}
-</div>
-
-<div style="font-size:10px;">${rating}</div>
-
-<div style="
-margin-left:6px;
-width:8px;
-height:8px;
-border-radius:50%;
-background:${online ? '#00ff9f' : '#888'};
-box-shadow:${online ? '0 0 8px #00ff9f' : 'none'};
-animation:${online ? 'pulse 1.5s infinite' : 'none'};
-">
-</div>
-
-</div>
-`;
-
+          <div>
+            <div class="name">@${x.u}</div>
+            <div class="rating">${x.r}</div>
+            <div class="time">${timeAgo(x.j)}</div>
+          </div>
+        </div>
+      `).join("")}
+    `;
+  }
 }
 
-}
-
-}
-
-// animations
-const style = document.createElement("style");
-style.innerHTML = `
-@keyframes pulse{
-0%{transform:scale(1);}
-50%{transform:scale(1.4);}
-100%{transform:scale(1);}
-}
-@keyframes fadeIn{
-from{opacity:0;transform:translateY(10px);}
-to{opacity:1;transform:translateY(0);}
-}
-`;
-document.head.appendChild(style);
-
-loadMembers();
-setInterval(loadMembers,30000);
-
+load();
+setInterval(load,20000); // updates when someone joins/leaves
 </script>
+
+</body>
+</html>
