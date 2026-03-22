@@ -1,285 +1,129 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-
-<style>
-*{
-box-sizing:border-box;
-margin:0;
-padding:0;
-}
-
-html,body{
-background:transparent;
-font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;
-overflow:hidden;
-}
-
-body{
-padding:0;
-}
-
-.widget{
-width:100%;
-padding:8px;
-border-radius:24px;
-background:#090a0c;
-}
-
-.section-title{
-margin:0 0 4px 0;
-font-size:18px;
-font-weight:800;
-color:#ffffff;
-text-align:center;
-}
-
-.welcome-text{
-font-size:12px;
-color:#c2c7d0;
-text-align:center;
-margin-bottom:12px;
-font-weight:500;
-}
-
-.inner-box{
-border:2px solid #9aa0aa;
-border-radius:22px;
-padding:16px;
-background:linear-gradient(180deg,#111214,#090a0c);
-box-shadow:0 0 14px rgba(160,160,170,0.12);
-}
-
-.member-row{
-display:flex;
-align-items:center;
-gap:10px;
-padding:8px 12px;
-border-radius:14px;
-border:2px solid #9aa0aa;
-background:linear-gradient(90deg,#1a1c20,#2c3138);
-transition:.18s;
-margin:8px 0;
-}
-
-.member-row:hover{
-background:linear-gradient(90deg,#6e7681,#9aa0aa);
-box-shadow:0 6px 18px rgba(180,180,190,.32);
-transform:translateY(-3px);
-}
-
-.avatar{
-width:36px;
-height:36px;
-border-radius:50%;
-border:2px solid #9aa0aa;
-object-fit:cover;
-background:#111214;
-flex-shrink:0;
-}
-
-.member-info{
-flex:1;
-text-align:left;
-min-width:0;
-}
-
-.member-name{
-font-size:12px;
-font-weight:700;
-color:#ffffff;
-text-decoration:none;
-white-space:nowrap;
-overflow:hidden;
-text-overflow:ellipsis;
-}
-
-.member-name:hover{
-text-decoration:underline;
-}
-
-.member-elo{
-font-size:11px;
-color:#c2c7d0;
-margin-top:2px;
-}
-
-.loading{
-font-size:12px;
-color:#c2c7d0;
-padding:10px 0;
-font-style:italic;
-}
-
-.footer-text{
-margin-top:10px;
-text-align:center;
-font-size:11px;
-color:#c2c7d0;
-font-weight:600;
-}
-
-</style>
+<title>NKT Member Widget</title>
 </head>
 
-<body>
+<body style="margin:0;background:transparent;">
 
-<div class="widget">
+<div id="app" style="
+width:250px;
+margin:0 auto;
+padding:14px;
+background:rgba(235,242,255,0.78);
+border-radius:20px;
+border:1px solid rgba(110,168,255,0.45);
+box-shadow:0 12px 30px rgba(0,0,0,0.25),0 0 25px rgba(110,168,255,0.25);
+backdrop-filter:blur(12px);
+font-family:Segoe UI;
+color:#0b1a2b;
+text-align:center;
+">
 
-<div class="inner-box">
-
-<div class="section-title">
-New Buddies 🫶
+<div style="
+font-size:14px;
+letter-spacing:2px;
+margin-bottom:12px;
+color:#2a4d8f;
+text-shadow:0 0 10px rgba(110,168,255,0.5);
+">
+NEW MEMBERS
 </div>
 
-<div class="welcome-text">
-Welcome onboard!
-</div>
+<div id="members"></div>
 
-<div id="members-list">
-<div class="loading">
-Loading new buddies...
-</div>
-</div>
-
-<div class="footer-text">
-Buckle Up! 🚀
-</div>
-
-</div>
 </div>
 
 <script>
 
-const CLUB_SLUG='blundering-buddies';
-const SHOW_COUNT=3;
-const REFRESH_MS=60000;
-
-async function fetchJSON(url){
-const res=await fetch(url);
-if(!res.ok) throw new Error('HTTP '+res.status);
-return res.json();
-}
-
-function getHighestElo(stats){
-
-const formats=[
-{key:'chess_rapid',label:'Rapid'},
-{key:'chess_blitz',label:'Blitz'},
-{key:'chess_bullet',label:'Bullet'},
-{key:'chess_daily',label:'Daily'}
-];
-
-let best=null;
-
-for(const f of formats){
-const rating=stats?.[f.key]?.last?.rating;
-
-if(rating && (!best || rating>best.rating)){
-best={rating,label:f.label};
-}
-}
-
-return best;
-}
+const club = "nashediyon-ki-toli"; // CHANGE if needed
 
 async function loadMembers(){
 
-const list=document.getElementById('members-list');
+let res = await fetch(`https://api.chess.com/pub/club/nashediyon-ki-toli/members`);
+let data = await res.json();
 
-try{
+// take first 3 users
+let users = data.all_time.slice(0,3);
 
-const clubData=await fetchJSON(`https://api.chess.com/pub/club/nashediyon-ki-toli/members`);
+let container = document.getElementById("members");
 
-const all=[
-...(clubData.weekly||[]),
-...(clubData.monthly||[]),
-...(clubData.all_time||[])
-];
+container.innerHTML = "";
 
-const seen=new Set();
+for(let i=0;i<users.length;i++){
 
-const unique=all.filter(m=>{
-if(seen.has(m.username)) return false;
-seen.add(m.username);
-return true;
-});
+let username = users[i].username;
 
-unique.sort((a,b)=>(b.joined||0)-(a.joined||0));
+// fetch profile
+let profileRes = await fetch(`https://api.chess.com/pub/player/${username}`);
+let profile = await profileRes.json();
 
-const recent=unique.slice(0,SHOW_COUNT);
+// fetch status
+let statusRes = await fetch(`https://api.chess.com/pub/player/${username}/is-online`);
+let statusData = await statusRes.json();
 
-const cards=await Promise.all(recent.map(async m=>{
+let online = statusData.online;
 
-let avatar='';
-let eloText='Unrated';
-let eloLabel='';
+if(i==0){
+// BIG CARD
+container.innerHTML += `
+<div style="
+margin-bottom:12px;
+padding:12px;
+border-radius:18px;
+background:linear-gradient(145deg,#0c1324,#05070d);
+color:#dbe6ff;
+border:1px solid rgba(110,168,255,0.3);
+box-shadow:0 0 10px rgba(110,168,255,0.3);
+">
 
-try{
+<img src="${profile.avatar || 'https://www.chess.com/bundles/web/images/noavatar_l.84a92436.gif'}"
+style="width:70px;height:70px;border-radius:50%;margin-bottom:8px;">
 
-const [profile,stats]=await Promise.all([
-fetchJSON(`https://api.chess.com/pub/player/${m.username}`),
-fetchJSON(`https://api.chess.com/pub/player/${m.username}/stats`)
-]);
+<div style="font-size:13px;">${username}</div>
 
-avatar=profile.avatar||'';
+<div style="
+font-size:10px;
+color:${online ? '#00ff9f' : '#888'};
+">
+${online ? '● ONLINE' : '● OFFLINE'}
+</div>
 
-const best=getHighestElo(stats);
+</div>
+`;
+}else{
+// SMALL CARDS
+container.innerHTML += `
+<div style="
+display:flex;
+align-items:center;
+padding:8px 10px;
+margin-bottom:8px;
+border-radius:999px;
+background:linear-gradient(145deg,#0c1324,#05070d);
+color:#dbe6ff;
+border:1px solid rgba(110,168,255,0.3);
+">
 
-if(best){
-eloText=best.rating;
-eloLabel=best.label+': ';
+<img src="${profile.avatar || 'https://www.chess.com/bundles/web/images/noavatar_l.84a92436.gif'}"
+style="width:32px;height:32px;border-radius:50%;margin-right:10px;">
+
+<div style="flex:1;text-align:left;font-size:12px;">${username}</div>
+
+<div style="font-size:10px;color:${online ? '#00ff9f' : '#888'};">
+●
+</div>
+
+</div>
+`;
 }
-
-}catch{}
-
-return{
-username:m.username,
-avatar,
-eloText,
-eloLabel
-};
-
-}));
-
-list.innerHTML=cards.map(c=>`
-
-<div class="member-row">
-
-<img class="avatar"
-src="${c.avatar||'https://www.chess.com/bundles/web/images/user-image.007dad08.svg'}"
-alt="${c.username}"
-onerror="this.src='https://www.chess.com/bundles/web/images/user-image.007dad08.svg'">
-
-<div class="member-info">
-
-<a class="member-name"
-href="https://www.chess.com/member/${c.username}"
-target="_blank">
-@${c.username}
-</a>
-
-<div class="member-elo">
-${c.eloLabel}${c.eloText}
-</div>
-
-</div>
-</div>
-
-`).join('');
-
-}catch{
-
-list.innerHTML='<div class="loading">Could not load members</div>';
 
 }
 
 }
 
 loadMembers();
-setInterval(loadMembers,REFRESH_MS);
 
 </script>
 
