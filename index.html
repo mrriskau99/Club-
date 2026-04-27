@@ -327,7 +327,6 @@ async function load(){
         const [profile, stats, online] = await Promise.all([
           fetchJSON(`https://api.chess.com/pub/player/${member.username}`),
           fetchJSON(`https://api.chess.com/pub/player/${member.username}/stats`),
-          fetchJSON(`https://api.chess.com/pub/player/${member.username}/is-online`)
         ]);
 
         return {
